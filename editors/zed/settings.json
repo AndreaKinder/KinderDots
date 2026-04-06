@@ -1,0 +1,52 @@
+{
+  "terminal": {
+    "dock": "right"
+  },
+  "agent": {
+    "inline_assistant_model": {
+      "provider": "ollama",
+      "model": "qwen2.5-coder:1.5b",
+      "enable_thinking": false,
+    },
+    "default_model": {
+      "provider": "ollama",
+      "model": "gemma3n:latest",
+      "enable_thinking": false,
+    },
+    "favorite_models": [
+      {
+        "provider": "ollama",
+        "model": "gemma3n:latest",
+        "enable_thinking": false,
+      },
+      {
+        "provider": "ollama",
+        "model": "gemma3n:latest",
+        "enable_thinking": false,
+      },
+    ],
+    "play_sound_when_agent_done": true,
+    "model_parameters": [],
+  },
+  "edit_predictions": {
+    "ollama": {
+      "prompt_format": "code_gemma",
+      "model": "qwen2.5-coder:1.5b",
+    },
+    "provider": "ollama",
+    "mode": "eager",
+  },
+  "agent_servers": {
+    "claude-acp": {
+      "type": "registry",
+    },
+  },
+  "icon_theme": "Zed (Default)",
+  "ui_font_size": 16,
+  "buffer_font_size": 15,
+  "theme": {
+    "mode": "dark",
+    "light": "Tokyo Night Light",
+    "dark": "Shades Of Purple",
+  },
+}

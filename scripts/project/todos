@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+source "$DOTLY_PATH/scripts/core/_main.sh"
+
+##? Buscar todos los TODO comments en un proyecto
+##?
+##? Usage:
+##?    todos [--save] [path]
+##?
+##? Options:
+##?    --save  Guardar resultados en TODO.md en la raíz del proyecto
+##?
+##? Arguments:
+##?    path  Directorio a buscar (default: directorio actual)
+
+docs::parse "$@"
+
+SEARCH_PATH="${arg_path:-.}"
+SAVE="${flag_save:-false}"
+
+if ! command -v rg &>/dev/null; then
+  echo "Error: ripgrep (rg) is required but not installed. Install with: brew install ripgrep"
+  exit 1
+fi
+
+TODO_PATTERN='(//\s*TODO:|#\s*TODO:|/\*\s*TODO:|\*\s*TODO:|<!--\s*TODO:)'
+
+RG_RESULTS=$(rg \
+  --line-number \
+  --no-heading \
+  --glob '!node_modules' \
+  --glob '!.git' \
+  --glob '!dist' \
+  --glob '!build' \
+  --glob '!*.lock' \
+  --glob '!*.min.*' \
+  "$TODO_PATTERN" \
+  "$SEARCH_PATH" \
+  | sed 's|^\./||') || true
+
+if [ -z "$RG_RESULTS" ]; then
+  echo "No TODOs found in $SEARCH_PATH"
+  exit 0
+fi
+
+if [ "$SAVE" = "true" ]; then
+  OUTPUT_FILE="$(realpath "$SEARCH_PATH")/TODO.md"
+
+  {
+    echo "# TODOs"
+    echo ""
+    echo "_Generated on $(date '+%Y-%m-%d %H:%M:%S')_"
+    echo ""
+
+    current_file=""
+    while IFS= read -r line; do
+      file=$(echo "$line" | cut -d: -f1)
+      lineno=$(echo "$line" | cut -d: -f2)
+      content=$(echo "$line" | cut -d: -f3- | sed 's/^\s*//')
+
+      if [ "$file" != "$current_file" ]; then
+        [ -n "$current_file" ] && echo ""
+        echo "## \`$file\`"
+        echo ""
+        current_file="$file"
+      fi
+
+      echo "- [ ] **L${lineno}** — $content"
+    done <<< "$RG_RESULTS"
+  } > "$OUTPUT_FILE"
+
+  echo "Saved to $OUTPUT_FILE"
+else
+  echo "$RG_RESULTS" | rg --color=always --passthru "$TODO_PATTERN" || true
+fi

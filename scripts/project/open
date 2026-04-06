@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+source "$DOTLY_PATH/scripts/core/_main.sh"
+
+##? Abrir un proyecto con un IDE especifico
+##?
+##? Usage:
+##?    open-project
+
+docs::parse "$@"
+
+PROJECTS_DIR="$PROJECTS"
+
+if ! command -v fzf &>/dev/null; then
+  echo "Error: fzf is required but not installed."
+  exit 1
+fi
+
+if [ ! -d "$PROJECTS_DIR" ]; then
+  echo "Error: Projects directory $PROJECTS_DIR not found."
+  exit 1
+fi
+
+PROJECT_NAME=$(cd "$PROJECTS_DIR" && find . -maxdepth 1 -mindepth 1 -type d -not -path '*/.*' | sed 's|^\./||' | sort | fzf --height 40% --layout=reverse --border --prompt="Project > ")
+
+if [ -z "$PROJECT_NAME" ]; then
+  echo "No project selected."
+  exit 0
+fi
+
+PROJECT_PATH="$PROJECTS_DIR/$PROJECT_NAME"
+
+# Select IDE
+IDE=$(echo -e "nvim\nzed\nopencode\nclaude" | fzf --height 20% --layout=reverse --border --prompt="IDE > ")
+
+if [ -z "$IDE" ]; then
+  echo "No IDE selected."
+  exit 0
+fi
+
+echo "Opening $PROJECT_NAME with $IDE..."
+case "$IDE" in
+nvim)
+  (cd "$PROJECT_PATH" && nvim .)
+  ;;
+zed)
+  zed "$PROJECT_PATH"
+  ;;
+opencode)
+  opencode "$PROJECT_PATH"
+  ;;
+claude)
+  (cd "$PROJECT_PATH" && claude)
+  ;;
+*)
+  echo "Unknown IDE: $IDE"
+  exit 1
+  ;;
+esac

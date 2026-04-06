@@ -1,0 +1,11 @@
+- clean: ["~"]
+
+- defaults:
+    link:
+      create: true
+      force: true
+- create:
+    - $HOME/Roms/
+
+- link:
+    ~/.dotly: os/linux/.dotly
