@@ -55,7 +55,7 @@ chezmoi add ~/.config/foo/config.conf
 - **fastfetch sin logo**: verificar `~/.config/branding/about.txt` y el `source` en `config.jsonc`.
 - **calendar-menu no abre nada**: verificar permisos (`chmod +x ~/.local/bin/calendar-menu`), que fuzzel esté instalado, y que `~/Notas/journal/` exista.
 - **voxtype no dicta**: `systemctl --user status voxtype`; el modelo se descarga en primer uso (`~/.local/share/voxtype/models`).
-- **Waybar no muestra cambios**: reiniciar waybar tras editar (`pkill -USR1 waybar` o relogin).
+- **Waybar no muestra cambios**: recargar waybar tras editar (`pkill -SIGUSR2 waybar` o relogin).
 - **IDs de PWA rotos**: ver `variables-a-adaptar.md` — se regeneran por instalación.
 
 ## Política de seguridad

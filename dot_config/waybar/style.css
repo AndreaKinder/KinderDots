@@ -85,6 +85,7 @@ tooltip label {
 }
 
 /* Módulos de la derecha separados con divisores TUI */
+#tray,
 #custom-heymail,
 #custom-voxtype,
 #backlight,
@@ -96,6 +97,15 @@ tooltip label {
     color: #cccccc;
     background-color: #000000;
     border-left: 1px solid #3a3a3a;
+}
+
+#tray > .passive {
+    -gtk-icon-effect: dim;
+}
+
+#tray > .needs-attention {
+    -gtk-icon-effect: highlight;
+    background-color: #aa0000;
 }
 
 #custom-heymail:hover,

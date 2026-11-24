@@ -16,7 +16,7 @@
 
 | Archivo | Función |
 |---|---|
-| `dot_config/waybar/config.jsonc` | Barra. Clock `on-click` → `calendar-menu`; módulos: workspaces, ventana, voxtype, brillo, audio, CPU, batería, sysmenu |
+| `dot_config/waybar/config.jsonc` | Barra. Clock `on-click` → `calendar-menu`; módulos: workspaces, ventana, tray, heymail, voxtype, brillo, audio, CPU, batería, sysmenu |
 | `dot_config/waybar/style.css` | Estilo monocromo de waybar |
 | `dot_config/waybar/power_menu.xml` | Menú de energía (xml para waybar) |
 | `dot_config/mako/config` | Notificaciones monocromáticas |

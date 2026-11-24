@@ -13,6 +13,7 @@
         "clock"
     ],
     "modules-right": [
+        "tray",
         "custom/heymail",
         "custom/voxtype",
         "backlight",
@@ -49,6 +50,11 @@
                 "today": "<span background='#cccccc' color='#000000'><b>{}</b></span>"
             }
         }
+    },
+
+    "tray": {
+        "icon-size": 14,
+        "spacing": 6
     },
 
     "custom/heymail": {
