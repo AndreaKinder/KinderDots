@@ -1,0 +1,91 @@
+# Tema monocromático TUI estilo tuigreet para btop
+
+# Fondo principal
+theme[main_bg]="#000000"
+
+# Texto principal
+theme[main_fg]="#cccccc"
+
+# Títulos de cajas
+theme[title]="#ffffff"
+
+# Atajos de teclado resaltados
+theme[hi_fg]="#ffffff"
+
+# Elemento seleccionado (vídeo inverso estilo tuigreet)
+theme[selected_bg]="#cccccc"
+theme[selected_fg]="#000000"
+
+# Texto inactivo / deshabilitado
+theme[inactive_fg]="#555555"
+
+# Texto sobre gráficas
+theme[graph_text]="#888888"
+
+# Fondo de barras de porcentaje
+theme[meter_bg]="#2a2a2a"
+
+# Miscelánea en procesos
+theme[proc_misc]="#aaaaaa"
+
+# Marcos de cajas
+theme[cpu_box]="#888888"
+theme[mem_box]="#888888"
+theme[net_box]="#888888"
+theme[proc_box]="#aaaaaa"
+
+# Líneas divisoras
+theme[div_line]="#444444"
+
+# Gráfica de temperatura
+theme[temp_start]="#666666"
+theme[temp_mid]="#bbbbbb"
+theme[temp_end]="#ffffff"
+
+# Gráfica de CPU
+theme[cpu_start]="#555555"
+theme[cpu_mid]="#aaaaaa"
+theme[cpu_end]="#ffffff"
+
+# Memoria/Disco libre
+theme[free_start]="#444444"
+theme[free_mid]="#777777"
+theme[free_end]="#aaaaaa"
+
+# Memoria/Disco en caché
+theme[cached_start]="#555555"
+theme[cached_mid]="#888888"
+theme[cached_end]="#cccccc"
+
+# Memoria/Disco disponible
+theme[available_start]="#666666"
+theme[available_mid]="#aaaaaa"
+theme[available_end]="#dddddd"
+
+# Memoria/Disco usada
+theme[used_start]="#777777"
+theme[used_mid]="#bbbbbb"
+theme[used_end]="#ffffff"
+
+# Red descarga
+theme[download_start]="#555555"
+theme[download_mid]="#aaaaaa"
+theme[download_end]="#ffffff"
+
+# Red subida
+theme[upload_start]="#444444"
+theme[upload_mid]="#888888"
+theme[upload_end]="#dddddd"
+
+# Gradiente de uso en lista de procesos
+theme[process_start]="#777777"
+theme[process_mid]="#bbbbbb"
+theme[process_end]="#ffffff"
+
+# Banners y seguimiento de procesos
+theme[proc_pause_bg]="#aa0000"
+theme[proc_follow_bg]="#cccccc"
+theme[proc_banner_bg]="#cccccc"
+theme[proc_banner_fg]="#000000"
+theme[followed_bg]="#cccccc"
+theme[followed_fg]="#000000"

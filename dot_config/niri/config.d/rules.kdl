@@ -1,0 +1,59 @@
+// Reglas de ventanas
+// https://niri-wm.github.io/niri/Configuration:-Window-Rules
+
+// Picture-in-Picture de Firefox como ventana flotante
+window-rule {
+    match app-id=r#"firefox$"# title="^Picture-in-Picture$"
+    open-floating true
+}
+
+// Abrir btop (desde Waybar) como ventana flotante
+window-rule {
+    match app-id="^btop$"
+    open-floating true
+    default-column-width { proportion 0.65; }
+    default-window-height { proportion 0.7; }
+    draw-border-with-background false
+}
+
+// Abrir calcurse (desde Waybar) como ventana flotante
+window-rule {
+    match app-id="^calcurse$"
+    open-floating true
+    default-column-width { proportion 0.65; }
+    default-window-height { proportion 0.7; }
+    draw-border-with-background false
+}
+
+// Evitar fondo sólido del focus-ring detrás del terminal transparente (foot)
+window-rule {
+    match app-id="^foot$"
+    match app-id="^footclient$"
+    draw-border-with-background false
+}
+
+// Quitar bordes y márgenes de ventana en todas las web apps (FirefoxPWA: WhatsApp, HEY, etc.)
+window-rule {
+    match app-id=r#"^FFPWA-"#
+    open-maximized-to-edges true
+    focus-ring {
+        off
+    }
+    border {
+        off
+    }
+    draw-border-with-background false
+}
+
+// Ejemplo: ocultar gestores de contraseñas en capturas de pantalla
+/-window-rule {
+    match app-id=r#"^org\.keepassxc\.KeePassXC$"#
+    match app-id=r#"^org\.gnome\.World\.Secrets$"#
+    block-out-from "screen-capture"
+}
+
+// Ejemplo: bordes redondeados para todas las ventanas
+/-window-rule {
+    geometry-corner-radius 12
+    clip-to-geometry true
+}

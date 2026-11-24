@@ -1,0 +1,163 @@
+/* Estética TUI monocromática minimalista basada en tuigreet (greetd en TTY Linux) */
+
+* {
+    font-family: "DejaVu Sans Mono", "MesloLGS Nerd Font", "MesloLGS Nerd Font Mono", "Liberation Mono", monospace;
+    font-size: 11px;
+    font-weight: normal;
+    border: none;
+    border-radius: 0;
+    min-height: 0;
+    box-shadow: none;
+    text-shadow: none;
+}
+
+window#waybar {
+    background-color: #000000;
+    border-bottom: 1px solid #aaaaaa;
+    color: #cccccc;
+}
+
+window#waybar.hidden {
+    opacity: 0.2;
+}
+
+/* Tooltips con marco rectangular estilo tuigreet */
+tooltip {
+    background-color: #000000;
+    border: 1px solid #cccccc;
+    border-radius: 0;
+}
+
+tooltip label {
+    color: #cccccc;
+    padding: 4px 8px;
+}
+
+/* Espacios de trabajo (badges invertidos estilo ESC/F2/F3/F12 de tuigreet) */
+#workspaces {
+    margin: 0;
+    padding: 0;
+    border-right: 1px solid #444444;
+}
+
+#workspaces button {
+    padding: 0 7px;
+    margin: 0;
+    background-color: #000000;
+    color: #888888;
+    border-right: 1px solid #2a2a2a;
+}
+
+#workspaces button:hover {
+    background-color: #222222;
+    color: #ffffff;
+}
+
+#workspaces button.active,
+#workspaces button.focused {
+    background-color: #cccccc;
+    color: #000000;
+    font-weight: bold;
+}
+
+#workspaces button.urgent {
+    background-color: #aa0000;
+    color: #ffffff;
+    font-weight: bold;
+}
+
+/* Título de ventana activa */
+#window {
+    padding: 0 10px;
+    color: #aaaaaa;
+}
+
+/* Reloj centrado (igual que la cabecera de tuigreet --time) */
+#clock {
+    padding: 0 10px;
+    color: #ffffff;
+    background-color: #000000;
+}
+
+#clock:hover {
+    background-color: #cccccc;
+    color: #000000;
+}
+
+/* Módulos de la derecha separados con divisores TUI */
+#custom-voxtype,
+#backlight,
+#wireplumber,
+#cpu,
+#battery,
+#custom-sysmenu {
+    padding: 0 8px;
+    color: #cccccc;
+    background-color: #000000;
+    border-left: 1px solid #3a3a3a;
+}
+
+#custom-voxtype:hover,
+#backlight:hover,
+#wireplumber:hover,
+#cpu:hover,
+#battery:hover,
+#custom-sysmenu:hover {
+    background-color: #cccccc;
+    color: #000000;
+}
+
+#custom-voxtype.idle {
+    color: #888888;
+}
+
+#custom-voxtype.recording {
+    background-color: #aa0000;
+    color: #ffffff;
+    font-weight: bold;
+    animation-name: blink-critical;
+    animation-duration: 0.7s;
+    animation-timing-function: steps(2);
+    animation-iteration-count: infinite;
+    animation-direction: alternate;
+}
+
+#custom-voxtype.transcribing {
+    color: #ffff55;
+    font-weight: bold;
+}
+
+#custom-voxtype.stopped {
+    color: #555555;
+}
+
+#wireplumber.muted {
+    color: #888888;
+}
+
+#battery.charging,
+#battery.plugged {
+    color: #ffffff;
+}
+
+#battery.warning:not(.charging) {
+    color: #ffff55;
+}
+
+@keyframes blink-critical {
+    to {
+        background-color: #aa0000;
+        color: #ffffff;
+    }
+}
+
+#battery.critical:not(.charging) {
+    background-color: #000000;
+    color: #ff5555;
+    font-weight: bold;
+    animation-name: blink-critical;
+    animation-duration: 0.7s;
+    animation-timing-function: steps(2);
+    animation-iteration-count: infinite;
+    animation-direction: alternate;
+}

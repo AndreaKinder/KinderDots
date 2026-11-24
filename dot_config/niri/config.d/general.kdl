@@ -1,0 +1,15 @@
+// Opciones generales, capturas y animaciones
+// https://niri-wm.github.io/niri/Configuration:-Animations
+
+hotkey-overlay {
+    // skip-at-startup
+}
+
+prefer-no-csd
+
+screenshot-path "~/Pictures/Screenshots/Screenshot from %Y-%m-%d %H-%M-%S.png"
+
+animations {
+    // off
+    // slowdown 3.0
+}

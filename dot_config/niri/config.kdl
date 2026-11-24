@@ -1,0 +1,10 @@
+// Configuración principal de Niri
+// https://niri-wm.github.io/niri/Configuration:-Introduction
+
+include "config.d/input.kdl"
+include "config.d/outputs.kdl"
+include "config.d/layout.kdl"
+include "config.d/startup.kdl"
+include "config.d/general.kdl"
+include "config.d/rules.kdl"
+include "config.d/binds.kdl"

@@ -1,0 +1,8 @@
+# Repos externos gestionados por chezmoi.
+# Neovim NO se duplica en este repo: chezmoi clona/actualiza KinderNvim.
+# Nota: los cambios locales de ~/.config/nvim (p.ej. lazy-lock.json) deben
+# estar commiteados y pusheados (lo hace Andrea manualmente) antes de aplicar.
+[".config/nvim"]
+type = "git-repo"
+url = "https://github.com/AndreaKinder/KinderNvim.git"
+refreshPeriod = "168h"

@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+notify_osd() {
+    local tag="$1"
+    local text="$2"
+    local value="${3:-}"
+    if [[ -n "$value" ]]; then
+        notify-send -e -a osd -t 1500 \
+            -h "string:x-canonical-private-synchronous:${tag}" \
+            -h "int:value:${value}" \
+            "$text" 2>/dev/null || true
+    else
+        notify-send -e -a osd -t 1500 \
+            -h "string:x-canonical-private-synchronous:${tag}" \
+            "$text" 2>/dev/null || true
+    fi
+}
+
+show_volume() {
+    local info vol icon
+    info=$(wpctl get-volume @DEFAULT_AUDIO_SINK@)
+    vol=$(awk '{printf "%d", $2 * 100 + 0.5}' <<< "$info")
+    if [[ "$info" == *"[MUTED]"* ]]; then
+        notify_osd "osd-volume" "  Volumen  SILENCIO" 0
+    else
+        if (( vol == 0 )); then
+            icon=""
+        elif (( vol < 50 )); then
+            icon=""
+        else
+            icon=""
+        fi
+        notify_osd "osd-volume" "${icon}  Volumen  ${vol}%" "$vol"
+    fi
+}
+
+show_mic() {
+    local info
+    info=$(wpctl get-volume @DEFAULT_AUDIO_SOURCE@)
+    if [[ "$info" == *"[MUTED]"* ]]; then
+        notify_osd "osd-mic" "  Micrófono  SILENCIO" 0
+    else
+        notify_osd "osd-mic" "  Micrófono  ACTIVO" 100
+    fi
+}
+
+get_backlight_dir() {
+    local d
+    for d in /sys/class/backlight/*; do
+        if [[ -d "$d" && -r "$d/brightness" && -r "$d/max_brightness" ]]; then
+            printf '%s\n' "$d"
+            return 0
+        fi
+    done
+    return 1
+}
+
+set_brightness() {
+    local direction="$1"
+    local dev_dir dev cur max step min_val target
+    dev_dir=$(get_backlight_dir) || return 1
+    dev=$(basename "$dev_dir")
+    cur=$(<"$dev_dir/brightness")
+    max=$(<"$dev_dir/max_brightness")
+    (( max > 0 )) || return 1
+
+    step=$(( (max * 5 + 50) / 100 ))
+    (( step < 1 )) && step=1
+
+    min_val=$(( (max + 99) / 100 ))
+    (( min_val < 1 )) && min_val=1
+
+    if [[ "$direction" == "up" ]]; then
+        target=$(( cur + step ))
+        (( target > max )) && target=$max
+    else
+        target=$(( cur - step ))
+        (( target < min_val )) && target=$min_val
+    fi
+
+    if command -v busctl >/dev/null 2>&1; then
+        busctl call org.freedesktop.login1 \
+            /org/freedesktop/login1/session/auto \
+            org.freedesktop.login1.Session SetBrightness \
+            ssu backlight "$dev" "$target"
+    elif command -v brightnessctl >/dev/null 2>&1; then
+        brightnessctl --class=backlight --device="$dev" set "$target" >/dev/null
+    elif [[ -w "$dev_dir/brightness" ]]; then
+        printf '%s\n' "$target" > "$dev_dir/brightness"
+    else
+        echo "No se pudo ajustar el brillo: no hay backend disponible" >&2
+        return 1
+    fi
+}
+
+show_brightness() {
+    local dev_dir cur max pct
+    dev_dir=$(get_backlight_dir) || return 1
+    cur=$(<"$dev_dir/brightness")
+    max=$(<"$dev_dir/max_brightness")
+    pct=$(awk -v c="$cur" -v m="$max" 'BEGIN { if (m > 0) printf "%d", (c * 100 / m) + 0.5; else print 0 }')
+    notify_osd "osd-brightness" "  Brillo  ${pct}%" "$pct"
+}
+
+case "${1:-}" in
+    vol-up)
+        wpctl set-mute @DEFAULT_AUDIO_SINK@ 0
+        wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+ -l 1.0
+        show_volume
+        ;;
+    vol-down)
+        wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-
+        show_volume
+        ;;
+    vol-mute)
+        wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle
+        show_volume
+        ;;
+    mic-mute)
+        wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle
+        show_mic
+        ;;
+    brightness-up)
+        set_brightness up
+        show_brightness
+        ;;
+    brightness-down)
+        set_brightness down
+        show_brightness
+        ;;
+    *)
+        echo "Uso: $0 {vol-up|vol-down|vol-mute|mic-mute|brightness-up|brightness-down}" >&2
+        exit 1
+        ;;
+esac

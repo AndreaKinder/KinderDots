@@ -1,0 +1,57 @@
+# Estética TUI monocromática minimalista (estilo tuigreet / Waybar)
+font=DejaVu Sans Mono 10
+background-color=#000000
+text-color=#cccccc
+border-color=#cccccc
+border-size=1
+border-radius=0
+padding=8,12
+margin=30,10,10,10
+width=320
+height=120
+anchor=top-right
+default-timeout=4000
+ignore-timeout=0
+icons=0
+markup=1
+format=<b>%s</b>\n%b
+
+[urgency=high]
+border-color=#aa0000
+text-color=#ffffff
+default-timeout=0
+
+# OSD flotante centrado arriba para volumen, brillo y micrófono
+[app-name=osd]
+anchor=top-center
+margin=34,0,0,0
+width=260
+height=44
+padding=8,14
+border-color=#cccccc
+background-color=#000000
+text-color=#ffffff
+progress-color=over #3a3a3a
+default-timeout=1500
+format=<b>%s</b>
+
+# Notificaciones de Voxtype centradas arriba para feedback inmediato al dictar
+[app-name=voxtype]
+anchor=top-center
+margin=34,0,0,0
+width=340
+padding=8,12
+border-color=#ffffff
+background-color=#000000
+text-color=#ffffff
+default-timeout=2500
+
+[app-name=Voxtype]
+anchor=top-center
+margin=34,0,0,0
+width=340
+padding=8,12
+border-color=#ffffff
+background-color=#000000
+text-color=#ffffff
+default-timeout=2500

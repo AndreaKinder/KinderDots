@@ -1,0 +1,41 @@
+#!/usr/bin/env fish
+# Menú calendario (Waybar → fuzzel): mes → día → nota diaria en Neovim.
+# Si la nota no existe, la crea desde la plantilla diaria de Obsidian.
+
+set year (date +%Y)
+set months Enero Febrero Marzo Abril Mayo Junio Julio Agosto Septiembre Octubre Noviembre Diciembre
+
+# 1. Elegir mes
+set choices
+for i in (seq (count $months))
+    set -a choices (printf '%02d - %s' $i $months[$i])
+end
+set picked (printf '%s\n' $choices | fuzzel --dmenu --prompt='Mes > ')
+if test -z "$picked"
+    exit 0
+end
+set month (string match -r '\d+' -- "$picked" | head -1)
+if test -z "$month"
+    exit 0
+end
+
+# 2. Elegir día del mes
+set last_day (date -d "$year-$month-01 +1 month -1 day" +%d)
+set day (seq -w 1 $last_day | fuzzel --dmenu --prompt='Día > ')
+if test -z "$day"
+    exit 0
+end
+
+# 3. Abrir (o crear desde plantilla) la nota diaria: ~/Notas/journal/AAAA-MM-DD.md
+set date "$year-$month-$day"
+set note "$HOME/Notas/journal/$date.md"
+if not test -f "$note"
+    set template "$HOME/Notas/templates/plantilla-diaria.md"
+    if test -f "$template"
+        sed "s/{{date}}/$date/g" "$template" > "$note"
+    else
+        touch "$note"
+    end
+end
+
+foot -e nvim "$note"

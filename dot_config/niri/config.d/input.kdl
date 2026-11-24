@@ -1,0 +1,28 @@
+// Dispositivos de entrada
+// https://niri-wm.github.io/niri/Configuration:-Input
+
+input {
+    keyboard {
+        xkb {
+            file "~/.config/niri/input/keymap.xkb"
+        }
+        numlock
+    }
+
+    touchpad {
+        tap
+        natural-scroll
+    }
+
+    mouse {
+    }
+
+    trackpoint {
+        scroll-method "on-button-down"
+        scroll-button 274
+        scroll-button-lock
+    }
+
+    // warp-mouse-to-focus
+    // focus-follows-mouse max-scroll-amount="0%"
+}

@@ -1,0 +1,857 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+NOTIFY_TAG="sysmenu"
+
+notify() {
+    local title="$1"
+    local body="${2:-}"
+    notify-send -a sysmenu -t 2500 \
+        -h "string:x-canonical-private-synchronous:${NOTIFY_TAG}" \
+        "$title" "$body" 2>/dev/null || true
+}
+
+# Muestra lista en fuzzel --dmenu y devuelve el índice 0-based (o vacío si se cancela)
+fuzzel_index() {
+    local prompt="$1"
+    local max_lines="${2:-12}"
+    local width="${3:-52}"
+    fuzzel --dmenu --index --minimal-lines \
+        --override=main.font="MesloLGS Nerd Font Mono:size=11" \
+        --line-height=36px \
+        --vertical-pad=18 \
+        --horizontal-pad=20 \
+        --inner-pad=12 \
+        --prompt="${prompt} > " \
+        --width="$width" \
+        --lines="$max_lines" 2>/dev/null || true
+}
+
+fuzzel_password() {
+    local prompt="$1"
+    fuzzel --dmenu --password \
+        --override=main.font="MesloLGS Nerd Font Mono:size=11" \
+        --vertical-pad=18 \
+        --horizontal-pad=20 \
+        --prompt-only="${prompt} > " \
+        --width=52 2>/dev/null || true
+}
+
+confirm_action() {
+    local prompt="$1"
+    local idx
+    idx=$(printf 'No\nSí\n' | fuzzel_index "$prompt" 2 36)
+    [[ "$idx" == "1" ]]
+}
+
+# ── Helpers de estado para el menú principal ──────────────────────────────────
+
+wifi_summary() {
+    if ! command -v nmcli >/dev/null 2>&1; then
+        echo "No disponible"
+        return
+    fi
+    local radio ssid
+    radio=$(LC_MESSAGES=C nmcli -t -f WIFI g 2>/dev/null || echo "disabled")
+    if [[ "$radio" != "enabled" ]]; then
+        echo "OFF"
+        return
+    fi
+    ssid=$(nmcli -t -f IN-USE,SSID dev wifi list --rescan no 2>/dev/null | sed -n 's/^\*://p' | head -n1 | sed 's/\\:/:/g')
+    if [[ -n "$ssid" ]]; then
+        echo "$ssid"
+    else
+        echo "Desconectado"
+    fi
+}
+
+bt_summary() {
+    if ! command -v bluetoothctl >/dev/null 2>&1; then
+        echo "No disponible"
+        return
+    fi
+    local powered count
+    powered=$(bluetoothctl show 2>/dev/null | awk '/Powered:/ {print $2; exit}')
+    if [[ "$powered" != "yes" ]]; then
+        echo "OFF"
+        return
+    fi
+    count=$(bluetoothctl devices Connected 2>/dev/null | grep -c '^Device ' || true)
+    if (( count > 0 )); then
+        echo "ON · ${count} con."
+    else
+        echo "ON"
+    fi
+}
+
+audio_out_summary() {
+    if ! command -v pactl >/dev/null 2>&1; then
+        echo "No disponible"
+        return
+    fi
+    local def info desc vol muted
+    def=$(pactl get-default-sink 2>/dev/null || true)
+    if [[ -z "$def" ]]; then
+        echo "Sin salida"
+        return
+    fi
+    desc=$(pactl -f json list sinks 2>/dev/null | jq -r --arg n "$def" '
+        .[] | select(.name == $n) |
+        (.active_port as $ap |
+         ((.ports // []) | map(select(.name == $ap)) | .[0].description // .description))
+    ' | head -n1)
+    [[ -z "$desc" ]] && desc="$def"
+    info=$(wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null || true)
+    if [[ "$info" == *"[MUTED]"* ]]; then
+        muted="MUTE"
+    elif [[ -n "$info" ]]; then
+        vol=$(awk '{printf "%d%%", $2 * 100 + 0.5}' <<< "$info")
+        muted="$vol"
+    else
+        muted=""
+    fi
+    # Recortar descripción larga para el resumen
+    if (( ${#desc} > 20 )); then
+        desc="${desc:0:19}…"
+    fi
+    if [[ -n "$muted" ]]; then
+        echo "${desc} · ${muted}"
+    else
+        echo "$desc"
+    fi
+}
+
+audio_in_summary() {
+    if ! command -v pactl >/dev/null 2>&1; then
+        echo "No disponible"
+        return
+    fi
+    local def desc info
+    def=$(pactl get-default-source 2>/dev/null || true)
+    if [[ -z "$def" ]]; then
+        echo "Sin entrada"
+        return
+    fi
+    desc=$(pactl -f json list sources 2>/dev/null | jq -r --arg n "$def" '
+        .[] | select(.name == $n) |
+        (.active_port as $ap |
+         ((.ports // []) | map(select(.name == $ap)) | .[0].description // .description))
+    ' | head -n1)
+    [[ -z "$desc" ]] && desc="$def"
+    if (( ${#desc} > 20 )); then
+        desc="${desc:0:19}…"
+    fi
+    info=$(wpctl get-volume @DEFAULT_AUDIO_SOURCE@ 2>/dev/null || true)
+    if [[ "$info" == *"[MUTED]"* ]]; then
+        echo "${desc} · MUTE"
+    else
+        echo "$desc"
+    fi
+}
+
+brightness_summary() {
+    local d cur max
+    for d in /sys/class/backlight/*; do
+        if [[ -r "$d/brightness" && -r "$d/max_brightness" ]]; then
+            cur=$(<"$d/brightness")
+            max=$(<"$d/max_brightness")
+            awk -v c="$cur" -v m="$max" 'BEGIN { if (m > 0) printf "%d%%", (c * 100 / m) + 0.5; else print "0%" }'
+            return
+        fi
+    done
+    echo "N/A"
+}
+
+power_summary() {
+    if command -v powerprofilesctl >/dev/null 2>&1; then
+        powerprofilesctl get 2>/dev/null || echo "N/A"
+    else
+        echo "N/A"
+    fi
+}
+
+# ── Submenú: Wi-Fi ────────────────────────────────────────────────────────────
+
+wifi_connect() {
+    local ssid="$1"
+    local sec="$2"
+
+    # Si ya existe perfil guardado, intentar conectar directamente
+    if nmcli -t -f NAME,TYPE connection show 2>/dev/null | sed 's/\\:/:/g' | grep -Fxq "${ssid}:802-11-wireless"; then
+        notify "Wi-Fi" "Conectando a ${ssid}..."
+        if nmcli connection up "$ssid" >/dev/null 2>&1; then
+            notify "Wi-Fi conectado" "$ssid"
+            return 0
+        fi
+    fi
+
+    if [[ -z "$sec" || "$sec" == "--" || "$sec" == "Abierta" ]]; then
+        notify "Wi-Fi" "Conectando a ${ssid}..."
+        if nmcli dev wifi connect "$ssid" >/dev/null 2>&1; then
+            notify "Wi-Fi conectado" "$ssid"
+        else
+            notify "Error Wi-Fi" "No se pudo conectar a ${ssid}"
+        fi
+        return
+    fi
+
+    local pass
+    pass=$(fuzzel_password "Clave (${ssid})")
+    [[ -z "$pass" ]] && return 0
+
+    notify "Wi-Fi" "Conectando a ${ssid}..."
+    if nmcli dev wifi connect "$ssid" password "$pass" >/dev/null 2>&1; then
+        notify "Wi-Fi conectado" "$ssid"
+    else
+        # Limpiar perfil fallido para poder reintentar con otra clave
+        nmcli connection delete "$ssid" >/dev/null 2>&1 || true
+        notify "Error Wi-Fi" "Clave incorrecta o fallo al conectar a ${ssid}"
+    fi
+}
+
+menu_wifi() {
+    local from_main="${1:-0}"
+    local rescan="no"
+
+    while true; do
+        local radio active_ssid
+        radio=$(LC_MESSAGES=C nmcli -t -f WIFI g 2>/dev/null || echo "disabled")
+        active_ssid=""
+
+        local -a labels=()
+        local -a actions=()
+        local -a extra=()
+
+        if (( from_main )); then
+            labels+=("← Volver")
+            actions+=("back")
+            extra+=("")
+        fi
+
+        if [[ "$radio" == "enabled" ]]; then
+            labels+=("Desactivar Wi-Fi")
+            actions+=("toggle-off")
+            extra+=("")
+
+            labels+=("↻ Escanear redes")
+            actions+=("rescan")
+            extra+=("")
+
+            active_ssid=$(nmcli -t -f IN-USE,SSID dev wifi list --rescan no 2>/dev/null | sed -n 's/^\*://p' | head -n1 | sed 's/\\:/:/g')
+            if [[ -n "$active_ssid" ]]; then
+                labels+=("✕ Desconectar (${active_ssid})")
+                actions+=("disconnect")
+                extra+=("$active_ssid")
+            fi
+
+            local wifi_lines
+            wifi_lines=$(nmcli -t -f IN-USE,SIGNAL,SECURITY,SSID dev wifi list --rescan "$rescan" 2>/dev/null || true)
+            rescan="no"
+
+            if [[ -z "$wifi_lines" ]]; then
+                wifi_lines=$(nmcli -t -f IN-USE,SIGNAL,SECURITY,SSID dev wifi list --rescan yes 2>/dev/null || true)
+            fi
+
+            while IFS=$'\t' read -r inuse sig sec ssid; do
+                [[ -z "$ssid" ]] && continue
+                local mark="[ ]"
+                [[ "$inuse" == "*" ]] && mark="[*]"
+                local sec_lbl="${sec:-Abierta}"
+                [[ "$sec_lbl" == "--" ]] && sec_lbl="Abierta"
+                labels+=("$(printf '%s %3s%%  %-9s %s' "$mark" "$sig" "${sec_lbl:0:9}" "$ssid")")
+                actions+=("connect:${ssid}")
+                extra+=("$sec_lbl")
+            done < <(
+                awk -F: '
+                {
+                    inuse = $1
+                    sig = $2 + 0
+                    sec = $3
+                    ssid = ""
+                    for (i = 4; i <= NF; i++) {
+                        ssid = (i == 4 ? $i : ssid ":" $i)
+                    }
+                    gsub(/\\:/, ":", ssid)
+                    if (ssid == "") next
+                    if (!(ssid in seen) || inuse == "*" || (act[ssid] != "*" && sig > best[ssid])) {
+                        seen[ssid] = 1
+                        best[ssid] = sig
+                        secmap[ssid] = sec
+                        act[ssid] = (inuse == "*" || act[ssid] == "*") ? "*" : " "
+                    }
+                }
+                END {
+                    for (s in seen) {
+                        printf "%d\t%03d\t%s\t%s\t%s\n", (act[s] == "*" ? 1 : 0), best[s], act[s], secmap[s], s
+                    }
+                }' <<< "$wifi_lines" | sort -t$'\t' -k1,1nr -k2,2nr | cut -f3-
+            )
+        else
+            labels+=("Activar Wi-Fi")
+            actions+=("toggle-on")
+            extra+=("")
+        fi
+
+        local idx
+        idx=$(printf '%s\n' "${labels[@]}" | fuzzel_index "Wi-Fi" 14 58)
+        [[ -z "$idx" ]] && return 0
+
+        local act="${actions[$idx]}"
+        case "$act" in
+            back)
+                return 1
+                ;;
+            toggle-on)
+                nmcli radio wifi on >/dev/null 2>&1 || true
+                notify "Wi-Fi" "Wi-Fi activado"
+                rescan="yes"
+                ;;
+            toggle-off)
+                nmcli radio wifi off >/dev/null 2>&1 || true
+                notify "Wi-Fi" "Wi-Fi desactivado"
+                ;;
+            rescan)
+                notify "Wi-Fi" "Escaneando redes..."
+                rescan="yes"
+                ;;
+            disconnect)
+                local dev
+                dev=$(nmcli -t -f DEVICE,TYPE dev status 2>/dev/null | awk -F: '$2=="wifi"{print $1; exit}')
+                if [[ -n "$dev" ]]; then
+                    nmcli dev disconnect "$dev" >/dev/null 2>&1 || true
+                    notify "Wi-Fi" "Desconectado de ${extra[$idx]}"
+                fi
+                ;;
+            connect:*)
+                local target_ssid="${act#connect:}"
+                wifi_connect "$target_ssid" "${extra[$idx]}"
+                return 0
+                ;;
+        esac
+    done
+}
+
+# ── Submenú: Bluetooth ────────────────────────────────────────────────────────
+
+menu_bluetooth_device() {
+    local mac="$1"
+    local name="$2"
+    local connected="$3"
+    local paired="$4"
+
+    local -a labels=("← Volver")
+    local -a actions=("back")
+
+    if [[ "$connected" == "yes" ]]; then
+        labels+=("Desconectar")
+        actions+=("disconnect")
+    elif [[ "$paired" == "yes" ]]; then
+        labels+=("Conectar")
+        actions+=("connect")
+    else
+        labels+=("Emparejar y conectar")
+        actions+=("pair-connect")
+    fi
+
+    if [[ "$paired" == "yes" ]]; then
+        labels+=("Olvidar dispositivo")
+        actions+=("remove")
+    fi
+
+    local idx
+    idx=$(printf '%s\n' "${labels[@]}" | fuzzel_index "BT: ${name}" 6 52)
+    [[ -z "$idx" ]] && return 0
+
+    case "${actions[$idx]}" in
+        back) return 1 ;;
+        connect)
+            notify "Bluetooth" "Conectando a ${name}..."
+            if bluetoothctl connect "$mac" >/dev/null 2>&1; then
+                notify "Bluetooth conectado" "$name"
+            else
+                notify "Error Bluetooth" "No se pudo conectar a ${name}"
+            fi
+            ;;
+        disconnect)
+            if bluetoothctl disconnect "$mac" >/dev/null 2>&1; then
+                notify "Bluetooth desconectado" "$name"
+            else
+                notify "Error Bluetooth" "No se pudo desconectar ${name}"
+            fi
+            ;;
+        pair-connect)
+            notify "Bluetooth" "Emparejando con ${name}..."
+            bluetoothctl trust "$mac" >/dev/null 2>&1 || true
+            if bluetoothctl pair "$mac" >/dev/null 2>&1 && bluetoothctl connect "$mac" >/dev/null 2>&1; then
+                notify "Bluetooth conectado" "$name"
+            else
+                notify "Error Bluetooth" "Fallo al emparejar/conectar ${name}"
+            fi
+            ;;
+        remove)
+            if confirm_action "¿Olvidar ${name}?"; then
+                bluetoothctl remove "$mac" >/dev/null 2>&1 || true
+                notify "Bluetooth" "Dispositivo olvidado: ${name}"
+            fi
+            ;;
+    esac
+    return 0
+}
+
+menu_bluetooth() {
+    local from_main="${1:-0}"
+
+    while true; do
+        local powered
+        powered=$(bluetoothctl show 2>/dev/null | awk '/Powered:/ {print $2; exit}')
+
+        local -a labels=()
+        local -a actions=()
+        local -a meta_name=()
+        local -a meta_conn=()
+        local -a meta_pair=()
+
+        if (( from_main )); then
+            labels+=("← Volver")
+            actions+=("back")
+            meta_name+=("") ; meta_conn+=("") ; meta_pair+=("")
+        fi
+
+        if [[ "$powered" == "yes" ]]; then
+            labels+=("Desactivar Bluetooth")
+            actions+=("power-off")
+            meta_name+=("") ; meta_conn+=("") ; meta_pair+=("")
+
+            labels+=("↻ Buscar dispositivos (5s)")
+            actions+=("scan")
+            meta_name+=("") ; meta_conn+=("") ; meta_pair+=("")
+
+            local raw_devs=""
+            while read -r _ mac name; do
+                [[ -z "${mac:-}" ]] && continue
+                [[ -z "${name:-}" ]] && name="$mac"
+                local info conn pair batt rank
+                info=$(bluetoothctl info "$mac" 2>/dev/null || true)
+                conn=$(awk '/Connected:/ {print $2; exit}' <<< "$info")
+                pair=$(awk '/Paired:/ {print $2; exit}' <<< "$info")
+                batt=$(awk -F'[()]' '/Battery Percentage:/ {print $2; exit}' <<< "$info")
+                [[ "$conn" == "yes" ]] && rank=1 || { [[ "$pair" == "yes" ]] && rank=2 || rank=3; }
+                raw_devs+="${rank}"$'\t'"${mac}"$'\t'"${conn:-no}"$'\t'"${pair:-no}"$'\t'"${batt:-}"$'\t'"${name}"$'\n'
+            done < <(bluetoothctl devices 2>/dev/null | grep '^Device ' || true)
+
+            if [[ -n "$raw_devs" ]]; then
+                while IFS=$'\t' read -r _ mac conn pair batt name; do
+                    [[ -z "$mac" ]] && continue
+                    local mark="[ ]" state="Nuevo"
+                    if [[ "$conn" == "yes" ]]; then
+                        mark="[*]"
+                        state="Conectado"
+                    elif [[ "$pair" == "yes" ]]; then
+                        mark="[P]"
+                        state="Emparejado"
+                    fi
+                    local display="$name"
+                    [[ -n "$batt" ]] && display="${name} (${batt}%)"
+                    labels+=("$(printf '%s %-34s [%s]' "$mark" "${display:0:34}" "$state")")
+                    actions+=("dev:${mac}")
+                    meta_name+=("$name")
+                    meta_conn+=("$conn")
+                    meta_pair+=("$pair")
+                done < <(printf '%s' "$raw_devs" | sort -t$'\t' -k1,1n -k6,6f)
+            fi
+        else
+            labels+=("Activar Bluetooth")
+            actions+=("power-on")
+            meta_name+=("") ; meta_conn+=("") ; meta_pair+=("")
+        fi
+
+        local idx
+        idx=$(printf '%s\n' "${labels[@]}" | fuzzel_index "Bluetooth" 14 58)
+        [[ -z "$idx" ]] && return 0
+
+        local act="${actions[$idx]}"
+        case "$act" in
+            back)
+                return 1
+                ;;
+            power-on)
+                rfkill unblock bluetooth >/dev/null 2>&1 || true
+                bluetoothctl power on >/dev/null 2>&1 || true
+                notify "Bluetooth" "Bluetooth activado"
+                ;;
+            power-off)
+                bluetoothctl power off >/dev/null 2>&1 || true
+                notify "Bluetooth" "Bluetooth desactivado"
+                ;;
+            scan)
+                notify "Bluetooth" "Buscando dispositivos (5s)..."
+                bluetoothctl --timeout 5 scan on >/dev/null 2>&1 || true
+                ;;
+            dev:*)
+                local mac="${act#dev:}"
+                if menu_bluetooth_device "$mac" "${meta_name[$idx]}" "${meta_conn[$idx]}" "${meta_pair[$idx]}"; then
+                    return 0
+                fi
+                ;;
+        esac
+    done
+}
+
+# ── Submenú: Salida de audio ──────────────────────────────────────────────────
+
+menu_audio_out() {
+    local from_main="${1:-0}"
+
+    while true; do
+        local def_sink mute_state
+        def_sink=$(pactl get-default-sink 2>/dev/null || true)
+        mute_state=$(wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null || true)
+
+        local -a labels=()
+        local -a actions=()
+        local -a ports=()
+        local -a descs=()
+
+        if (( from_main )); then
+            labels+=("← Volver")
+            actions+=("back") ; ports+=("") ; descs+=("")
+        fi
+
+        if [[ "$mute_state" == *"[MUTED]"* ]]; then
+            labels+=("Activar sonido (quitar silencio)")
+        else
+            labels+=("Silenciar salida de audio")
+        fi
+        actions+=("mute") ; ports+=("") ; descs+=("")
+
+        while IFS=$'\t' read -r is_active sink_name port_name label_desc; do
+            [[ -z "$sink_name" ]] && continue
+            local mark="[ ]"
+            [[ "$is_active" == "1" ]] && mark="[*]"
+            labels+=("${mark} ${label_desc}")
+            actions+=("sink:${sink_name}")
+            ports+=("$port_name")
+            descs+=("$label_desc")
+        done < <(
+            pactl -f json list sinks 2>/dev/null | jq -r --arg def "$def_sink" '
+                .[] |
+                .name as $sname |
+                .description as $sdesc |
+                .active_port as $aport |
+                ((.ports // []) | map(select(.availability != "not available"))) as $avail |
+                if ($avail | length) > 1 then
+                    $avail[] |
+                    [
+                        (if ($sname == $def and .name == $aport) then "1" else "0" end),
+                        $sname,
+                        .name,
+                        "\($sdesc) · \(.description)"
+                    ] | @tsv
+                else
+                    [
+                        (if $sname == $def then "1" else "0" end),
+                        $sname,
+                        ($aport // ""),
+                        (if ($avail | length) == 1 then "\($sdesc) · \($avail[0].description)" else $sdesc end)
+                    ] | @tsv
+                end
+            '
+        )
+
+        local idx
+        idx=$(printf '%s\n' "${labels[@]}" | fuzzel_index "Salida audio" 12 58)
+        [[ -z "$idx" ]] && return 0
+
+        local act="${actions[$idx]}"
+        case "$act" in
+            back)
+                return 1
+                ;;
+            mute)
+                /home/andrea/.local/bin/osd vol-mute
+                ;;
+            sink:*)
+                local target_sink="${act#sink:}"
+                local target_port="${ports[$idx]}"
+                pactl set-default-sink "$target_sink" >/dev/null 2>&1 || true
+                if [[ -n "$target_port" ]]; then
+                    pactl set-sink-port "$target_sink" "$target_port" >/dev/null 2>&1 || true
+                fi
+                # Mover reproducciones activas a la nueva salida
+                while read -r stream_id _; do
+                    [[ -n "${stream_id:-}" ]] && pactl move-sink-input "$stream_id" "$target_sink" >/dev/null 2>&1 || true
+                done < <(pactl list short sink-inputs 2>/dev/null || true)
+                notify "Salida de audio" "${descs[$idx]}"
+                return 0
+                ;;
+        esac
+    done
+}
+
+# ── Submenú: Entrada de audio (micrófono) ─────────────────────────────────────
+
+menu_audio_in() {
+    local from_main="${1:-0}"
+
+    while true; do
+        local def_src mute_state
+        def_src=$(pactl get-default-source 2>/dev/null || true)
+        mute_state=$(wpctl get-volume @DEFAULT_AUDIO_SOURCE@ 2>/dev/null || true)
+
+        local -a labels=()
+        local -a actions=()
+        local -a ports=()
+        local -a descs=()
+
+        if (( from_main )); then
+            labels+=("← Volver")
+            actions+=("back") ; ports+=("") ; descs+=("")
+        fi
+
+        if [[ "$mute_state" == *"[MUTED]"* ]]; then
+            labels+=("Activar micrófono")
+        else
+            labels+=("Silenciar micrófono")
+        fi
+        actions+=("mute") ; ports+=("") ; descs+=("")
+
+        while IFS=$'\t' read -r is_active src_name port_name label_desc; do
+            [[ -z "$src_name" ]] && continue
+            local mark="[ ]"
+            [[ "$is_active" == "1" ]] && mark="[*]"
+            labels+=("${mark} ${label_desc}")
+            actions+=("source:${src_name}")
+            ports+=("$port_name")
+            descs+=("$label_desc")
+        done < <(
+            pactl -f json list sources 2>/dev/null | jq -r --arg def "$def_src" '
+                .[] | select(.name | endswith(".monitor") | not) |
+                .name as $sname |
+                .description as $sdesc |
+                .active_port as $aport |
+                ((.ports // []) | map(select(.availability != "not available"))) as $avail |
+                if ($avail | length) > 1 then
+                    $avail[] |
+                    [
+                        (if ($sname == $def and .name == $aport) then "1" else "0" end),
+                        $sname,
+                        .name,
+                        "\($sdesc) · \(.description)"
+                    ] | @tsv
+                else
+                    [
+                        (if $sname == $def then "1" else "0" end),
+                        $sname,
+                        ($aport // ""),
+                        (if ($avail | length) == 1 then "\($sdesc) · \($avail[0].description)" else $sdesc end)
+                    ] | @tsv
+                end
+            '
+        )
+
+        local idx
+        idx=$(printf '%s\n' "${labels[@]}" | fuzzel_index "Entrada audio" 12 58)
+        [[ -z "$idx" ]] && return 0
+
+        local act="${actions[$idx]}"
+        case "$act" in
+            back)
+                return 1
+                ;;
+            mute)
+                /home/andrea/.local/bin/osd mic-mute
+                ;;
+            source:*)
+                local target_src="${act#source:}"
+                local target_port="${ports[$idx]}"
+                pactl set-default-source "$target_src" >/dev/null 2>&1 || true
+                if [[ -n "$target_port" ]]; then
+                    pactl set-source-port "$target_src" "$target_port" >/dev/null 2>&1 || true
+                fi
+                while read -r stream_id _; do
+                    [[ -n "${stream_id:-}" ]] && pactl move-source-output "$stream_id" "$target_src" >/dev/null 2>&1 || true
+                done < <(pactl list short source-outputs 2>/dev/null || true)
+                notify "Entrada de audio" "${descs[$idx]}"
+                return 0
+                ;;
+        esac
+    done
+}
+
+# ── Submenú: Brillo ───────────────────────────────────────────────────────────
+
+set_brightness_pct() {
+    local pct="$1"
+    local d dev max target
+    for d in /sys/class/backlight/*; do
+        if [[ -r "$d/max_brightness" ]]; then
+            dev=$(basename "$d")
+            max=$(<"$d/max_brightness")
+            target=$(( (max * pct + 50) / 100 ))
+            (( target < 1 )) && target=1
+            (( target > max )) && target=$max
+            busctl call org.freedesktop.login1 \
+                /org/freedesktop/login1/session/auto \
+                org.freedesktop.login1.Session SetBrightness \
+                ssu backlight "$dev" "$target"
+            notify-send -e -a osd -t 1500 \
+                -h "string:x-canonical-private-synchronous:osd-brightness" \
+                -h "int:value:${pct}" \
+                "  Brillo  ${pct}%" 2>/dev/null || true
+            return 0
+        fi
+    done
+}
+
+menu_brightness() {
+    local from_main="${1:-0}"
+    local -a labels=()
+    local -a actions=()
+
+    if (( from_main )); then
+        labels+=("← Volver") ; actions+=("back")
+    fi
+    labels+=("100%" "75%" "50%" "25%" "10%" "1%")
+    actions+=("100" "75" "50" "25" "10" "1")
+
+    local idx
+    idx=$(printf '%s\n' "${labels[@]}" | fuzzel_index "Brillo ($(brightness_summary))" 8 36)
+    [[ -z "$idx" ]] && return 0
+
+    local act="${actions[$idx]}"
+    [[ "$act" == "back" ]] && return 1
+    set_brightness_pct "$act"
+    return 0
+}
+
+# ── Submenú: Perfil de energía ────────────────────────────────────────────────
+
+menu_power_profile() {
+    local from_main="${1:-0}"
+    if ! command -v powerprofilesctl >/dev/null 2>&1; then
+        notify "Energía" "powerprofilesctl no está disponible"
+        return 0
+    fi
+
+    local cur
+    cur=$(powerprofilesctl get 2>/dev/null || true)
+
+    local -a labels=()
+    local -a actions=()
+
+    if (( from_main )); then
+        labels+=("← Volver") ; actions+=("back")
+    fi
+
+    local p mark desc
+    for p in performance balanced power-saver; do
+        mark="[ ]"
+        [[ "$p" == "$cur" ]] && mark="[*]"
+        case "$p" in
+            performance) desc="Rendimiento (performance)" ;;
+            balanced)    desc="Equilibrado (balanced)" ;;
+            power-saver) desc="Ahorro (power-saver)" ;;
+        esac
+        labels+=("${mark} ${desc}")
+        actions+=("$p")
+    done
+
+    local idx
+    idx=$(printf '%s\n' "${labels[@]}" | fuzzel_index "Energía" 6 42)
+    [[ -z "$idx" ]] && return 0
+
+    local act="${actions[$idx]}"
+    [[ "$act" == "back" ]] && return 1
+    powerprofilesctl set "$act" >/dev/null 2>&1 && notify "Perfil de energía" "$act"
+    return 0
+}
+
+# ── Submenú: Sesión ───────────────────────────────────────────────────────────
+
+menu_session() {
+    local from_main="${1:-0}"
+    local -a labels=()
+    local -a actions=()
+
+    if (( from_main )); then
+        labels+=("← Volver") ; actions+=("back")
+    fi
+    if command -v swaylock >/dev/null 2>&1; then
+        labels+=("  Bloquear pantalla") ; actions+=("lock")
+    fi
+    labels+=(
+        "  Apagar pantallas"
+        "  Suspender"
+        "  Cerrar sesión (Niri)"
+        "  Reiniciar"
+        "  Apagar equipo"
+    )
+    actions+=(
+        "dpms-off"
+        "suspend"
+        "logout"
+        "reboot"
+        "poweroff"
+    )
+
+    local idx
+    idx=$(printf '%s\n' "${labels[@]}" | fuzzel_index "Sesión" 8 40)
+    [[ -z "$idx" ]] && return 0
+
+    case "${actions[$idx]}" in
+        back)     return 1 ;;
+        lock)     swaylock ;;
+        dpms-off) niri msg action power-off-monitors ;;
+        suspend)  systemctl suspend ;;
+        logout)   confirm_action "¿Cerrar sesión?" && niri msg action quit --skip-confirmation ;;
+        reboot)   confirm_action "¿Reiniciar equipo?" && systemctl reboot ;;
+        poweroff) confirm_action "¿Apagar equipo?" && systemctl poweroff ;;
+    esac
+    return 0
+}
+
+# ── Menú principal ────────────────────────────────────────────────────────────
+
+menu_main() {
+    while true; do
+        local -a labels=(
+            "$(printf '  %-15s [%s]' 'Wi-Fi'         "$(wifi_summary)")"
+            "$(printf '  %-15s [%s]' 'Bluetooth'     "$(bt_summary)")"
+            "$(printf '  %-15s [%s]' 'Salida audio'  "$(audio_out_summary)")"
+            "$(printf '  %-15s [%s]' 'Entrada audio' "$(audio_in_summary)")"
+            "$(printf '  %-15s [%s]' 'Brillo'        "$(brightness_summary)")"
+            "$(printf '  %-15s [%s]' 'Energía'       "$(power_summary)")"
+            "$(printf '  %-15s [%s]' 'Sesión'        'Suspender / Apagar')"
+        )
+        local -a actions=(wifi bluetooth audio-out audio-in brightness power session)
+
+        local idx
+        idx=$(printf '%s\n' "${labels[@]}" | fuzzel_index "Sistema" 10 56)
+        [[ -z "$idx" ]] && return 0
+
+        case "${actions[$idx]}" in
+            wifi)       menu_wifi 1          && return 0 || true ;;
+            bluetooth)  menu_bluetooth 1     && return 0 || true ;;
+            audio-out)  menu_audio_out 1     && return 0 || true ;;
+            audio-in)   menu_audio_in 1      && return 0 || true ;;
+            brightness) menu_brightness 1    && return 0 || true ;;
+            power)      menu_power_profile 1 && return 0 || true ;;
+            session)    menu_session 1       && return 0 || true ;;
+        esac
+    done
+}
+
+case "${1:-main}" in
+    main)           menu_main ;;
+    wifi)           menu_wifi 0 ;;
+    bluetooth|bt)   menu_bluetooth 0 ;;
+    audio|out)      menu_audio_out 0 ;;
+    mic|in)         menu_audio_in 0 ;;
+    brightness)     menu_brightness 0 ;;
+    power)          menu_power_profile 0 ;;
+    session)        menu_session 0 ;;
+    *)
+        echo "Uso: $0 [main|wifi|bluetooth|audio|mic|brightness|power|session]" >&2
+        exit 1
+        ;;
+esac

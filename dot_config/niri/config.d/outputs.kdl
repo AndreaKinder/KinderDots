@@ -1,0 +1,8 @@
+// Monitores y salidas
+// https://niri-wm.github.io/niri/Configuration:-Outputs
+// Usa `niri msg outputs` para consultar los nombres y modos disponibles.
+
+output "eDP-1" {
+    mode "1920x1080@60.006"
+    scale 1.5
+}

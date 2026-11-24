@@ -1,0 +1,39 @@
+# Configuración de Voxtype (~/.config/voxtype/config.toml)
+
+state_file = "auto"
+
+[hotkey]
+# Desactivado: el atajo (Alt+Space) lo gestiona Niri con `voxtype record toggle`
+enabled = false
+
+[audio]
+device = "default"
+sample_rate = 16000
+max_duration_secs = 60
+
+[whisper]
+model = "small"
+language = "es"
+translate = false
+on_demand_loading = false
+
+[output]
+mode = "type"
+fallback_to_clipboard = true
+type_delay_ms = 0
+pre_type_delay_ms = 0
+
+[output.notification]
+on_recording_start = true
+on_recording_stop = true
+on_transcription = true
+on_no_speech = true
+
+[vad]
+enabled = true
+backend = "energy"
+threshold = 0.5
+min_speech_duration_ms = 100
+
+[osd]
+enabled = false

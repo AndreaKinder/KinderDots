@@ -1,0 +1,4 @@
+# Archivos del repositorio que chezmoi NO debe desplegar en $HOME
+bootstrap.sh
+README.md
+LICENSE

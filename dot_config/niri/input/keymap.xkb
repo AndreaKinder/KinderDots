@@ -1,0 +1,47 @@
+xkb_keymap {
+    xkb_keycodes  { include "evdev+aliases(qwerty)" };
+    xkb_types     {
+        include "complete"
+        type "FOUR_LEVEL_SUPER_CLIP" {
+            modifiers = Shift+Lock+LevelThree+Mod4+Control;
+            map[None] = Level1;
+            map[Shift] = Level2;
+            map[Lock] = Level2;
+            map[LevelThree] = Level3;
+            map[Shift+LevelThree] = Level4;
+            map[Lock+LevelThree] = Level4;
+            map[Control] = Level1;
+            preserve[Control] = Control;
+            map[Shift+Control] = Level2;
+            preserve[Shift+Control] = Shift+Control;
+            map[Control+Lock] = Level2;
+            preserve[Control+Lock] = Control;
+            map[Mod4] = Level5;
+            map[Mod4+Lock] = Level5;
+            map[Shift+Mod4] = Level2;
+            preserve[Shift+Mod4] = Shift+Mod4;
+            map[Control+Mod4] = Level1;
+            preserve[Control+Mod4] = Control+Mod4;
+            map[Shift+Control+Mod4] = Level2;
+            preserve[Shift+Control+Mod4] = Shift+Control+Mod4;
+            level_name[Level1] = "Base";
+            level_name[Level2] = "Shift";
+            level_name[Level3] = "Alt Base";
+            level_name[Level4] = "Shift Alt";
+            level_name[Level5] = "Super Clipboard";
+        };
+    };
+    xkb_compat    { include "complete" };
+    xkb_symbols   {
+        include "pc+es+inet(evdev)"
+        key <AB03> {
+            type = "FOUR_LEVEL_SUPER_CLIP",
+            symbols[Group1] = [ c, C, cent, copyright, XF86Copy ]
+        };
+        key <AB04> {
+            type = "FOUR_LEVEL_SUPER_CLIP",
+            symbols[Group1] = [ v, V, doublelowquotemark, singlelowquotemark, XF86Paste ]
+        };
+    };
+    xkb_geometry  { include "pc(pc105)" };
+};
