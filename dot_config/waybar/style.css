@@ -85,6 +85,7 @@ tooltip label {
 }
 
 /* Módulos de la derecha separados con divisores TUI */
+#custom-heymail,
 #custom-voxtype,
 #backlight,
 #wireplumber,
@@ -97,6 +98,7 @@ tooltip label {
     border-left: 1px solid #3a3a3a;
 }
 
+#custom-heymail:hover,
 #custom-voxtype:hover,
 #backlight:hover,
 #wireplumber:hover,
@@ -105,6 +107,19 @@ tooltip label {
 #custom-sysmenu:hover {
     background-color: #cccccc;
     color: #000000;
+}
+
+#custom-heymail.unread {
+    color: #ffffff;
+    font-weight: bold;
+}
+
+#custom-heymail.clean {
+    color: #888888;
+}
+
+#custom-heymail.error {
+    color: #aa0000;
 }
 
 #custom-voxtype.idle {

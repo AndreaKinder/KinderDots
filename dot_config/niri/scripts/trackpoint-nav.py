@@ -77,7 +77,7 @@ def main() -> int:
     except PermissionError:
         print(
             f"trackpoint-nav: sin permiso para leer {dev_path}. "
-            f"Ejecuta: sudo usermod -aG input {os.environ.get('USER', 'andrea')} "
+            f"Ejecuta: sudo usermod -aG input {os.environ.get('USER', '$USER')} "
             "y vuelve a iniciar sesión.",
             file=sys.stderr,
         )

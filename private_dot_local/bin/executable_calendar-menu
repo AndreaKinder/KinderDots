@@ -1,41 +1,101 @@
 #!/usr/bin/env fish
-# Menú calendario (Waybar → fuzzel): mes → día → nota diaria en Neovim.
-# Si la nota no existe, la crea desde la plantilla diaria de Obsidian.
+# Menú calendario visual en cuadrícula (Waybar → rofi): navega por meses y abre/crea la nota diaria en Neovim.
 
 set year (date +%Y)
+set month (math (date +%m))
+set today_y (date +%Y)
+set today_m (math (date +%m))
+set today_d (math (date +%d))
+
 set months Enero Febrero Marzo Abril Mayo Junio Julio Agosto Septiembre Octubre Noviembre Diciembre
+set journal_dir "$HOME/Notas/journal"
+set template "$HOME/Notas/templates/plantilla-diaria.md"
 
-# 1. Elegir mes
-set choices
-for i in (seq (count $months))
-    set -a choices (printf '%02d - %s' $i $months[$i])
-end
-set picked (printf '%s\n' $choices | fuzzel --dmenu --prompt='Mes > ')
-if test -z "$picked"
-    exit 0
-end
-set month (string match -r '\d+' -- "$picked" | head -1)
-if test -z "$month"
-    exit 0
-end
+while true
+    set month_pad (printf '%02d' $month)
+    set first_dow (date -d "$year-$month_pad-01" +%u) # 1=Lun .. 7=Dom
+    set last_day (math (date -d "$year-$month_pad-01 +1 month -1 day" +%d))
+    set title "$months[$month] $year"
 
-# 2. Elegir día del mes
-set last_day (date -d "$year-$month-01 +1 month -1 day" +%d)
-set day (seq -w 1 $last_day | fuzzel --dmenu --prompt='Día > ')
-if test -z "$day"
-    exit 0
-end
-
-# 3. Abrir (o crear desde plantilla) la nota diaria: ~/Notas/journal/AAAA-MM-DD.md
-set date "$year-$month-$day"
-set note "$HOME/Notas/journal/$date.md"
-if not test -f "$note"
-    set template "$HOME/Notas/templates/plantilla-diaria.md"
-    if test -f "$template"
-        sed "s/{{date}}/$date/g" "$template" > "$note"
-    else
-        touch "$note"
+    set -l rows
+    # Fila 1 (7 columnas): navegación y cabecera
+    set -a rows "<b>‹</b>" " " " " "<b>$months[$month]</b>" "<b>$year</b>" " " "<b>›</b>"
+    # Fila 2 (7 columnas): días de la semana
+    for wd in Lu Ma Mi Ju Vi Sá Do
+        set -a rows "<span color='#777777'><b>$wd</b></span>"
     end
-end
 
-foot -e nvim "$note"
+    # Huecos previos al día 1
+    set pad_before (math "$first_dow - 1")
+    for _ in (seq 1 $pad_before)
+        set -a rows " "
+    end
+
+    # Días del mes
+    for d in (seq 1 $last_day)
+        set d_pad (printf '%02d' $d)
+        set note_file "$journal_dir/$year-$month_pad-$d_pad.md"
+        set is_today 0
+        if test "$year" = "$today_y" -a "$month" = "$today_m" -a "$d" = "$today_d"
+            set is_today 1
+        end
+
+        if test $is_today -eq 1 -a -f "$note_file"
+            set -a rows "<span color='#ffffff'><b><u>$d_pad*</u></b></span>"
+        else if test $is_today -eq 1
+            set -a rows "<span color='#ffffff'><b><u>$d_pad</u></b></span>"
+        else if test -f "$note_file"
+            set -a rows "<span color='#f0abfc'><b>$d_pad·</b></span>"
+        else
+            set -a rows "$d_pad"
+        end
+    end
+
+    set picked (printf '%s\n' $rows | rofi -dmenu -markup-rows -i \
+        -theme ~/.config/rofi/calendar.rasi \
+        -p "$title" \
+        -mesg "Enter: abrir nota  |  <span color='#f0abfc'>·</span> con nota  |  ‹ / › cambiar mes")
+
+    if test -z "$picked"
+        exit 0
+    end
+
+    # Limpiar etiquetas Pango para leer el texto elegido
+    set clean (string replace -ra '<[^>]+>' '' -- "$picked" | string trim)
+
+    if test "$clean" = "‹"
+        set month (math "$month - 1")
+        if test $month -lt 1
+            set month 12
+            set year (math "$year - 1")
+        end
+        continue
+    else if test "$clean" = "›"
+        set month (math "$month + 1")
+        if test $month -gt 12
+            set month 1
+            set year (math "$year + 1")
+        end
+        continue
+    end
+
+    set day_num (string match -r '^\d{1,2}' -- "$clean")
+    if test -z "$day_num"
+        continue
+    end
+
+    set day_pad (printf '%02d' $day_num)
+    set date_str "$year-$month_pad-$day_pad"
+    set note "$journal_dir/$date_str.md"
+
+    mkdir -p "$journal_dir"
+    if not test -f "$note"
+        if test -f "$template"
+            sed "s/{{date}}/$date_str/g" "$template" > "$note"
+        else
+            touch "$note"
+        end
+    end
+
+    exec foot -e nvim "$note"
+end

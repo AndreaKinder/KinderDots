@@ -513,17 +513,6 @@ print_post_install() {
   4. Primer uso de Voxtype (Alt+Space):
      Descargará el modelo Whisper 'small' en ~/.local/share/voxtype/models.
 EOF
-
-    if [[ "$USER" != "andrea" ]]; then
-        cat <<EOF
-
-  [!] Tu usuario es '$USER' (distinto de 'andrea'). Revisa las rutas fijas en:
-      - ~/.config/fish/config.fish
-      - ~/.config/waybar/config.jsonc
-      - ~/.config/niri/config.d/startup.kdl
-      - ~/.local/bin/sysmenu
-EOF
-    fi
     printf '\n'
 }
 

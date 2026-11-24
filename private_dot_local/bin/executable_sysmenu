@@ -11,30 +11,24 @@ notify() {
         "$title" "$body" 2>/dev/null || true
 }
 
-# Muestra lista en fuzzel --dmenu y devuelve el índice 0-based (o vacío si se cancela)
+# Muestra lista en rofi -dmenu y devuelve el índice 0-based (o vacío si se cancela)
 fuzzel_index() {
     local prompt="$1"
     local max_lines="${2:-12}"
     local width="${3:-52}"
-    fuzzel --dmenu --index --minimal-lines \
-        --override=main.font="MesloLGS Nerd Font Mono:size=11" \
-        --line-height=36px \
-        --vertical-pad=18 \
-        --horizontal-pad=20 \
-        --inner-pad=12 \
-        --prompt="${prompt} > " \
-        --width="$width" \
-        --lines="$max_lines" 2>/dev/null || true
+    local px_width=$(( width * 9 ))
+    rofi -dmenu -format i -i \
+        -theme ~/.config/rofi/tuigreet.rasi \
+        -theme-str "window { width: ${px_width}px; } listview { lines: ${max_lines}; }" \
+        -p "${prompt}" 2>/dev/null || true
 }
 
 fuzzel_password() {
     local prompt="$1"
-    fuzzel --dmenu --password \
-        --override=main.font="MesloLGS Nerd Font Mono:size=11" \
-        --vertical-pad=18 \
-        --horizontal-pad=20 \
-        --prompt-only="${prompt} > " \
-        --width=52 2>/dev/null || true
+    rofi -dmenu -password \
+        -theme ~/.config/rofi/tuigreet.rasi \
+        -theme-str "window { width: 460px; } listview { lines: 0; }" \
+        -p "${prompt}" 2>/dev/null || true
 }
 
 confirm_action() {
@@ -568,7 +562,7 @@ menu_audio_out() {
                 return 1
                 ;;
             mute)
-                /home/andrea/.local/bin/osd vol-mute
+                "$HOME/.local/bin/osd" vol-mute
                 ;;
             sink:*)
                 local target_sink="${act#sink:}"
@@ -659,7 +653,7 @@ menu_audio_in() {
                 return 1
                 ;;
             mute)
-                /home/andrea/.local/bin/osd mic-mute
+                "$HOME/.local/bin/osd" mic-mute
                 ;;
             source:*)
                 local target_src="${act#source:}"

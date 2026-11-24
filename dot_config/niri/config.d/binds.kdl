@@ -6,10 +6,12 @@ binds {
 
     // Aplicaciones y sistema
     Mod+Return hotkey-overlay-title="Open a Terminal: foot" { spawn "foot"; }
-    Mod+Space hotkey-overlay-title="Run an Application: fuzzel" { spawn "fuzzel"; }
-    Mod+W repeat=false hotkey-overlay-title="WhatsApp" { spawn "firefoxpwa" "site" "launch" "01M8587NAATCJ6J8Q3VRRAXX37"; }
+    Mod+Space hotkey-overlay-title="Run an Application: rofi" { spawn "rofi" "-show" "drun"; }
+    Mod+B repeat=false hotkey-overlay-title="Browser: ardia" { spawn "/usr/bin/ardia"; }
+    Mod+E repeat=false hotkey-overlay-title="Files: nautilus" { spawn "nautilus"; }
+    Mod+W repeat=false hotkey-overlay-title="WhatsApp" { spawn "firefoxpwa" "site" "launch" "01M7SHF20HH1SQ5DAMZ8HM0YB9"; }
     Mod+S repeat=false hotkey-overlay-title="Menú de sistema: Wi-Fi, Bluetooth, Audio..." { spawn "~/.local/bin/sysmenu"; }
-    Mod+Alt+V repeat=false hotkey-overlay-title="Historial del portapapeles: cliphist" { spawn-sh "cliphist list | fuzzel --dmenu --prompt='Portapapeles > ' | cliphist decode | wl-copy"; }
+    Mod+Alt+V repeat=false hotkey-overlay-title="Historial del portapapeles: cliphist" { spawn-sh "cliphist list | rofi -dmenu -i -theme ~/.config/rofi/tuigreet.rasi -p 'Portapapeles' | cliphist decode | wl-copy"; }
     Mod+Alt+K repeat=false hotkey-overlay-title="Teclado virtual: wvkbd" { spawn-sh "pkill -x wvkbd-mobintl || wvkbd-mobintl"; }
     Alt+Space repeat=false hotkey-overlay-title="Dictado por voz: voxtype" { spawn "voxtype" "record" "toggle"; }
     Super+Alt+L hotkey-overlay-title="Lock the Screen: swaylock" { spawn "swaylock"; }

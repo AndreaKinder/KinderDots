@@ -1,0 +1,14 @@
+configuration {
+    modi: "drun,run,window";
+    show-icons: false;
+    font: "MesloLGL Nerd Font Mono 10";
+    drun-display-format: "{name}";
+    disable-history: false;
+    case-sensitive: false;
+    cycle: true;
+    hover-select: true;
+    me-select-entry: "";
+    me-accept-entry: "MousePrimary";
+}
+
+@theme "~/.config/rofi/tuigreet.rasi"

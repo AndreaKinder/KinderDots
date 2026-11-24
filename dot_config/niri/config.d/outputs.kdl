@@ -2,7 +2,17 @@
 // https://niri-wm.github.io/niri/Configuration:-Outputs
 // Usa `niri msg outputs` para consultar los nombres y modos disponibles.
 
+// Portátil (izquierda, alineado por el borde superior con el ultrawide)
 output "eDP-1" {
-    mode "1920x1080@60.006"
+    mode "1920x1080@59.934"
     scale 1.5
+    position x=0 y=0
+}
+
+// Monitor externo LG Ultrawide (derecha del portátil: x = 1920 / 1.5 = 1280)
+output "HDMI-A-1" {
+    mode "2560x1080@59.978"
+    scale 1
+    position x=1280 y=0
+    focus-at-startup
 }

@@ -12,13 +12,16 @@ Los IDs de `firefoxpwa site launch` **no son reproducibles**. Tras instalar las 
   ```
 - HEY Mail → verificar el `.desktop` regenerado en `~/.local/share/applications/`.
 
-## 2. Rutas de usuario
+## 2. Rutas de usuario (ya portables)
 
-- `dot_config/environment.d/10-kinder.conf.tmpl` → ya usa `{{ .chezmoi.homeDir }}` (automático). Verificar que el vault se llame `Notas` y esté en `$HOME`.
-- `private_dot_local/bin/executable_calendar-menu` → usa `$HOME` (portable). Verificar `~/Notas/journal/` y `~/Notas/templates/plantilla-diaria.md`.
-- `dot_config/fish/config.fish` → línea `set -gx PATH "/home/andrea/.local/bin" $PATH` (hardcoded; usar `~/.local/bin` si el usuario cambia).
-- `dot_config/waybar/config.jsonc` → rutas absolutas `/home/andrea/.local/bin/...` en `on-click` (osd, sysmenu, calendar-menu).
-- `dot_config/niri/config.d/startup.kdl` → ruta del wallpaper (`~/Imágenes/Wallpapers/...`).
+Todos los archivos usan `$HOME`, `~` o `{{ .chezmoi.homeDir }}` sin rutas absolutas de usuario:
+- `dot_config/environment.d/10-kinder.conf.tmpl` → `{{ .chezmoi.homeDir }}`. Verificar que el vault se llame `Notas` y esté en `$HOME`.
+- `private_dot_local/bin/executable_calendar-menu` → `$HOME`. Verificar `~/Notas/journal/` y `~/Notas/templates/plantilla-diaria.md`.
+- `dot_config/fish/config.fish` → `fish_add_path -p "$HOME/.local/bin"`.
+- `dot_config/waybar/config.jsonc` → `$HOME/.local/bin/...` en todos los módulos.
+- `dot_config/btop/btop.conf` → `color_theme = "tuigreet-mono"`.
+- `dot_config/niri/config.d/startup.kdl` → `$HOME/Imágenes/Wallpapers/06-kinder-midnight-oled.png`.
+- `private_dot_local/bin/executable_sysmenu` → `"$HOME/.local/bin/osd"`.
 
 ## 3. Formato de notas diarias
 

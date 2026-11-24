@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PWA_ID="01M7Y10CWF0X27PJ6RNVS9M5YQ"
+
+status_json() {
+    if ! command -v hey >/dev/null 2>&1; then
+        jq -cn '{"text":" ?","tooltip":"hey CLI no instalado","class":"error"}'
+        return 0
+    fi
+
+    local raw
+    if ! raw=$(timeout 12 hey box view imbox --limit 50 --json 2>/dev/null); then
+        jq -cn '{"text":" !","tooltip":"No se pudo consultar HEY (sin red o sesión caducada)","class":"error"}'
+        return 0
+    fi
+
+    if ! jq -e '.data.postings' >/dev/null 2>&1 <<<"$raw"; then
+        jq -cn '{"text":" !","tooltip":"Respuesta inválida de hey CLI","class":"error"}'
+        return 0
+    fi
+
+    local unread tooltip text class
+    unread=$(jq '[.data.postings[] | select(.seen != true and .observed_at == null)] | length' <<<"$raw")
+
+    if (( unread > 0 )); then
+        text=" ${unread}"
+        class="unread"
+        tooltip=$(jq -r '
+            [.data.postings[] | select(.seen != true and .observed_at == null) |
+             "• " + (.creator.name // .alternative_sender_name // .creators[0].name // .sender.name // "Desconocido") + ": " + (.name // .subject // .summary // "(sin asunto)")]
+            | .[0:8] | join("\n")
+        ' <<<"$raw")
+        tooltip="HEY Imbox (${unread} sin leer)\n${tooltip}"
+    else
+        text=""
+        class="clean"
+        tooltip="HEY Imbox: todo leído"
+    fi
+
+    jq -cn --arg text "$text" --arg tooltip "$tooltip" --arg class "$class" \
+        '{"text":$text,"tooltip":$tooltip,"class":$class}'
+}
+
+open_pwa() {
+    firefoxpwa site launch "$PWA_ID" >/dev/null 2>&1 &
+}
+
+menu_box() {
+    local box="$1"
+    local raw
+    if ! raw=$(timeout 12 hey box view "$box" --limit 25 --json 2>/dev/null); then
+        notify-send -a heymail "HEY Mail" "Error al cargar el buzón ${box}"
+        return 1
+    fi
+
+    local lines topics idx
+    mapfile -t lines < <(jq -r '
+        .data.postings[] |
+        (if (.seen == true or .observed_at != null) then "  " else "● " end) +
+        (.creator.name // .alternative_sender_name // .creators[0].name // .sender.name // "?") + " — " +
+        (.name // .subject // .summary // "(sin asunto)")
+    ' <<<"$raw")
+    mapfile -t topics < <(jq -r '.data.postings[] | (.topic_id // .id)' <<<"$raw")
+
+    if (( ${#lines[@]} == 0 )); then
+        notify-send -a heymail "HEY Mail" "No hay mensajes en ${box}"
+        return 0
+    fi
+
+    idx=$(printf '%s\n' "${lines[@]}" | rofi -dmenu -format i -i \
+        -theme ~/.config/rofi/tuigreet.rasi \
+        -theme-str 'window { width: 680px; } listview { lines: 12; }' \
+        -p "HEY · ${box}") || return 0
+
+    [[ -z "$idx" ]] && return 0
+    local topic_id="${topics[$idx]}"
+
+    local action
+    action=$(printf 'Leer hilo en terminal\nAbrir HEY PWA\n' | rofi -dmenu -format i -i \
+        -theme ~/.config/rofi/tuigreet.rasi \
+        -theme-str 'window { width: 360px; } listview { lines: 2; }' \
+        -p "Acción") || return 0
+
+    if [[ "$action" == "0" ]]; then
+        foot -T "HEY Thread" -e bash -c "hey thread read '$topic_id' | less -R" &
+    elif [[ "$action" == "1" ]]; then
+        open_pwa
+    fi
+}
+
+menu_main() {
+    local choice
+    choice=$(printf 'Imbox\nThe Feed\nPaper Trail\nAbrir HEY PWA\nRefrescar contador\n' | rofi -dmenu -format i -i \
+        -theme ~/.config/rofi/tuigreet.rasi \
+        -theme-str 'window { width: 380px; } listview { lines: 5; }' \
+        -p "HEY Mail") || exit 0
+
+    case "$choice" in
+        0) menu_box "imbox" ;;
+        1) menu_box "feed" ;;
+        2) menu_box "papertrail" ;;
+        3) open_pwa ;;
+        4) pkill -RTMIN+8 waybar 2>/dev/null || true ;;
+    esac
+}
+
+case "${1:-status}" in
+    status) status_json ;;
+    --menu|menu) menu_main ;;
+    --pwa|pwa) open_pwa ;;
+    *) status_json ;;
+esac

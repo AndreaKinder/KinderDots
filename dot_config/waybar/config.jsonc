@@ -13,6 +13,7 @@
         "clock"
     ],
     "modules-right": [
+        "custom/heymail",
         "custom/voxtype",
         "backlight",
         "wireplumber",
@@ -36,7 +37,7 @@
         // Mismo formato que `tuigreet --time` (ej: "lun, 23 nov 2026 - 22:13")
         "format": "{:%a, %d %b %Y - %H:%M}",
         "tooltip-format": "<tt><small>{calendar}</small></tt>",
-        "on-click": "/home/andrea/.local/bin/calendar-menu",
+        "on-click": "$HOME/.local/bin/calendar-menu",
         "calendar": {
             "mode": "month",
             "mode-mon-col": 3,
@@ -48,6 +49,16 @@
                 "today": "<span background='#cccccc' color='#000000'><b>{}</b></span>"
             }
         }
+    },
+
+    "custom/heymail": {
+        "exec": "$HOME/.local/bin/heymail-waybar status",
+        "return-type": "json",
+        "interval": 60,
+        "signal": 8,
+        "tooltip": true,
+        "on-click": "$HOME/.local/bin/heymail-waybar --menu",
+        "on-click-right": "$HOME/.local/bin/heymail-waybar --pwa"
     },
 
     "custom/voxtype": {
@@ -68,8 +79,8 @@
     "backlight": {
         "device": "intel_backlight",
         "format": " {percent}%",
-        "on-scroll-up": "/home/andrea/.local/bin/osd brightness-up",
-        "on-scroll-down": "/home/andrea/.local/bin/osd brightness-down",
+        "on-scroll-up": "$HOME/.local/bin/osd brightness-up",
+        "on-scroll-down": "$HOME/.local/bin/osd brightness-down",
         "tooltip-format": "Brillo: {percent}%"
     },
 
@@ -77,10 +88,10 @@
         "format": "{icon} {volume}%",
         "format-muted": " MUTE",
         "format-icons": ["", "", ""],
-        "on-click": "/home/andrea/.local/bin/osd vol-mute",
-        "on-click-right": "/home/andrea/.local/bin/sysmenu audio",
-        "on-scroll-up": "/home/andrea/.local/bin/osd vol-up",
-        "on-scroll-down": "/home/andrea/.local/bin/osd vol-down",
+        "on-click": "$HOME/.local/bin/osd vol-mute",
+        "on-click-right": "$HOME/.local/bin/sysmenu audio",
+        "on-scroll-up": "$HOME/.local/bin/osd vol-up",
+        "on-scroll-down": "$HOME/.local/bin/osd vol-down",
         "tooltip-format": "{node_name}: {volume}%"
     },
 
@@ -108,6 +119,6 @@
     "custom/sysmenu": {
         "format": "",
         "tooltip-format": "Menú de sistema (Mod+S): Wi-Fi, Bluetooth, Audio...",
-        "on-click": "/home/andrea/.local/bin/sysmenu"
+        "on-click": "$HOME/.local/bin/sysmenu"
     }
 }

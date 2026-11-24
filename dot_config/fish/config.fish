@@ -7,4 +7,4 @@ end
 
 
 # Added by Antigravity CLI installer
-set -gx PATH "/home/andrea/.local/bin" $PATH
+fish_add_path -p "$HOME/.local/bin"

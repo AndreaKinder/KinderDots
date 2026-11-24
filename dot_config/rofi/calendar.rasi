@@ -1,0 +1,29 @@
+@import "~/.config/rofi/tuigreet.rasi"
+
+window {
+    width:    430px;
+    location: north;
+    anchor:   north;
+    y-offset: 28px;
+}
+
+inputbar {
+    children: [ prompt, entry ];
+}
+
+listview {
+    columns:      7;
+    lines:        8;
+    fixed-height: false;
+    flow:         horizontal;
+    spacing:      4px;
+}
+
+element {
+    padding: 8px 4px;
+}
+
+element-text {
+    horizontal-align: 0.5;
+    vertical-align:   0.5;
+}
